@@ -1,0 +1,3 @@
+create_subdirectory_options(TINYLANG TOOL)
+
+AddTinyLangSubdirectory(driver)
