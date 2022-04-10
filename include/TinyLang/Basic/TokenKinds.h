@@ -17,10 +17,9 @@ namespace tinylang::token
     };
 
     const char *getTokenName(TokenKind kind) LLVM_READNONE;
-
     const char *getPunctuatorSpelling(TokenKind kind) LLVM_READNONE;
-
     const char *getKeywordSpelling(TokenKind kind) LLVM_READNONE;
+
 
 
 }    // namespace tinylang::token

@@ -3,6 +3,7 @@
 //
 
 #include "TinyLang/Parser/Parser.h"
+#include "TinyLang/Basic/TokenKinds.h"
 
 using namespace tinylang;
 namespace
@@ -15,12 +16,14 @@ namespace tinylang
 {
 
     Parser::Parser(Lexer &Lex, Sema &Actions) : Lex(Lex), Actions(Actions) { advance(); }
+
     ModuleDeclaration *Parser::parse()
     {
         ModuleDeclaration *ModDecl = nullptr;
         parseCompilationUnit(ModDecl);
         return ModDecl;
     }
+
     bool Parser::parseCompilationUnit(ModuleDeclaration *&D)
     {
         {
@@ -46,20 +49,21 @@ namespace tinylang
 
             Actions.actOnModuleDeclaration(D, Tok.getLocation(), Tok.getIdentifier(), Decls, Stmts);
             advance();
+
             if (consume(token::period)) goto _error;
 
             return false;
         }
-
     _error:
-        while (!Tok.is(token::eof)) advance();
+        while (!Tok.is(token::eof)) { advance(); }
         return false;
     }
+
     bool Parser::parseImport()
     {
         {
             IdentList Ids;
-            llvm::StringRef ModuleName;
+            StringRef ModuleName;
             if (Tok.is(token::kw_from))
             {
                 advance();
@@ -67,6 +71,7 @@ namespace tinylang
                 ModuleName = Tok.getIdentifier();
                 advance();
             }
+
             if (consume(token::kw_import)) goto _error;
             if (parseIdentList(Ids)) goto _error;
             if (expect(token::semi)) goto _error;
@@ -76,16 +81,17 @@ namespace tinylang
 
             return false;
         }
-
     _error:
-        while (!Tok.isOneOf(token::kw_begin, token::kw_const, token::kw_from, token::kw_import, token::kw_procedure,
-                            token::kw_var))
+        while (!Tok.isOneOf(token::kw_begin, token::kw_const, token::kw_end, token::kw_from, token::kw_import,
+                            token::kw_procedure, token::kw_var))
         {
             advance();
             if (Tok.is(token::eof)) return true;
         }
+
         return false;
     }
+
     bool Parser::parseBlock(DeclList &Decls, StmtList &Stmts)
     {
         {
@@ -101,17 +107,19 @@ namespace tinylang
             }
 
             if (consume(token::kw_end)) goto _error;
+
             return false;
         }
-
     _error:
         while (!Tok.is(token::identifier))
         {
             advance();
             if (Tok.is(token::eof)) return true;
         }
+
         return false;
     }
+
     bool Parser::parseDeclaration(DeclList &Decls)
     {
         {
@@ -151,6 +159,7 @@ namespace tinylang
             advance();
             if (Tok.is(token::eof)) return true;
         }
+
         return false;
     }
 
@@ -158,15 +167,18 @@ namespace tinylang
     {
         {
             if (expect(token::identifier)) goto _error;
-            llvm::SMLoc Loc = Tok.getLocation();
 
-            llvm::StringRef Name = Tok.getIdentifier();
+            SMLoc Loc      = Tok.getLocation();
+            StringRef Name = Tok.getIdentifier();
+
             advance();
             if (expect(token::equal)) goto _error;
             Expr *E = nullptr;
             advance();
+
             if (parseExpression(E)) goto _error;
             Actions.actOnConstantDeclaration(Decls, Loc, Name, E);
+
             return false;
         }
     _error:
@@ -183,10 +195,13 @@ namespace tinylang
         {
             Decl *D;
             IdentList Ids;
+
             if (parseIdentList(Ids)) goto _error;
             if (consume(token::colon)) goto _error;
             if (parseQualident(D)) goto _error;
+
             Actions.actOnVariableDeclaration(Decls, Ids, D);
+
             return false;
         }
     _error:
@@ -195,6 +210,7 @@ namespace tinylang
             advance();
             if (Tok.is(token::eof)) return true;
         }
+
         return false;
     }
 
@@ -203,27 +219,33 @@ namespace tinylang
         {
             if (consume(token::kw_procedure)) goto _error;
             if (expect(token::identifier)) goto _error;
-            ProcedureDeclaration *D = Actions.actOnProcedureDeclaration(Tok.getLocation(), Tok.getIdentifier());
 
+            ProcedureDeclaration *D = Actions.actOnProcedureDeclaration(Tok.getLocation(), Tok.getIdentifier());
             EnterDeclScope S(Actions, D);
+
             FormalParamList Params;
             Decl *RetType = nullptr;
             advance();
+
             if (Tok.is(token::lparen))
             {
                 if (parseFormalParameters(Params, RetType)) goto _error;
             }
             Actions.actOnProcedureHeading(D, Params, RetType);
+
             if (expect(token::semi)) goto _error;
+
             DeclList Decls;
             StmtList Stmts;
+
             advance();
             if (parseBlock(Decls, Stmts)) goto _error;
             if (expect(token::identifier)) goto _error;
-            Actions.actOnProcedureDeclaration(D, Tok.getLocation(), Tok.getIdentifier(), Decls, Stmts);
 
+            Actions.actOnProcedureDeclaration(D, Tok.getLocation(), Tok.getIdentifier(), Decls, Stmts);
             ParentDecls.push_back(D);
             advance();
+
             return false;
         }
     _error:
@@ -232,6 +254,7 @@ namespace tinylang
             advance();
             if (Tok.is(token::eof)) return true;
         }
+
         return false;
     }
 
@@ -286,15 +309,19 @@ namespace tinylang
             IdentList Ids;
             Decl *D;
             bool IsVar = false;
+
             if (Tok.is(token::kw_var))
             {
                 IsVar = true;
                 advance();
             }
+
             if (parseIdentList(Ids)) goto _error;
             if (consume(token::colon)) goto _error;
             if (parseQualident(D)) goto _error;
+
             Actions.actOnFormalParameterDeclaration(Params, Ids, D, IsVar);
+
             return false;
         }
     _error:
@@ -315,6 +342,7 @@ namespace tinylang
                 advance();
                 if (parseStatement(Stmts)) goto _error;
             }
+
             return false;
         }
     _error:
@@ -332,8 +360,9 @@ namespace tinylang
             if (Tok.is(token::identifier))
             {
                 Decl *D;
-                Expr *E         = nullptr;
-                llvm::SMLoc Loc = Tok.getLocation();
+                Expr *E   = nullptr;
+                SMLoc Loc = Tok.getLocation();
+
                 if (parseQualident(D)) goto _error;
                 if (Tok.is(token::colonequal))
                 {
@@ -348,7 +377,7 @@ namespace tinylang
                     {
                         advance();
                         if (Tok.isOneOf(token::lparen, token::plus, token::minus, token::kw_not, token::identifier,
-                                        token::integerLiteral))
+                                        token::StringLiteral))
                         {
                             if (parseExpList(Exprs)) goto _error;
                         }
@@ -390,7 +419,8 @@ namespace tinylang
         {
             Expr *E = nullptr;
             StmtList IfStmts, ElseStmts;
-            llvm::SMLoc Loc = Tok.getLocation();
+            SMLoc Loc = Tok.getLocation();
+
             if (consume(token::kw_if)) goto _error;
             if (parseExpression(E)) goto _error;
             if (consume(token::kw_then)) goto _error;
@@ -400,9 +430,12 @@ namespace tinylang
                 advance();
                 if (parseStatementSequence(ElseStmts)) goto _error;
             }
+
             if (expect(token::kw_end)) goto _error;
+
             Actions.actOnIfStatement(Stmts, Loc, E, IfStmts, ElseStmts);
             advance();
+
             return false;
         }
     _error:
@@ -419,14 +452,17 @@ namespace tinylang
         {
             Expr *E = nullptr;
             StmtList WhileStmts;
-            llvm::SMLoc Loc = Tok.getLocation();
+            SMLoc Loc = Tok.getLocation();
+
             if (consume(token::kw_while)) goto _error;
             if (parseExpression(E)) goto _error;
             if (consume(token::kw_do)) goto _error;
             if (parseStatementSequence(WhileStmts)) goto _error;
             if (expect(token::kw_end)) goto _error;
+
             Actions.actOnWhileStatement(Stmts, Loc, E, WhileStmts);
             advance();
+
             return false;
         }
     _error:
@@ -441,15 +477,18 @@ namespace tinylang
     bool Parser::parseReturnStatement(StmtList &Stmts)
     {
         {
-            Expr *E         = nullptr;
-            llvm::SMLoc Loc = Tok.getLocation();
+            Expr *E   = nullptr;
+            SMLoc Loc = Tok.getLocation();
+
             if (consume(token::kw_return)) goto _error;
             if (Tok.isOneOf(token::lparen, token::plus, token::minus, token::kw_not, token::identifier,
-                            token::integerLiteral))
+                            token::IntegerLiteral))
             {
                 if (parseExpression(E)) goto _error;
             }
+
             Actions.actOnReturnStatement(Stmts, Loc, E);
+
             return false;
         }
     _error:
@@ -465,8 +504,10 @@ namespace tinylang
     {
         {
             Expr *E = nullptr;
+
             if (parseExpression(E)) goto _error;
             if (E) Exprs.push_back(E);
+
             while (Tok.is(token::comma))
             {
                 E = nullptr;
@@ -474,6 +515,7 @@ namespace tinylang
                 if (parseExpression(E)) goto _error;
                 if (E) Exprs.push_back(E);
             }
+
             return false;
         }
     _error:
@@ -482,6 +524,7 @@ namespace tinylang
             advance();
             if (Tok.is(token::eof)) return true;
         }
+
         return false;
     }
 
@@ -489,12 +532,15 @@ namespace tinylang
     {
         {
             if (parseSimpleExpression(E)) goto _error;
-            if (Tok.isOneOf(token::hash, token::less, token::lessequal, token::equal, token::greater, token::greaterequal))
+            if (Tok.isOneOf(token::hash, token::less, token::lessequal, token::equal, token::greater,
+                            token::greaterequal))
             {
                 OperatorInfo Op;
                 Expr *Right = nullptr;
+
                 if (parseRelation(Op)) goto _error;
                 if (parseSimpleExpression(Right)) goto _error;
+
                 E = Actions.actOnExpression(E, Right, Op);
             }
             return false;
@@ -547,15 +593,17 @@ namespace tinylang
                 /*ERROR*/
                 goto _error;
             }
+
             return false;
         }
     _error:
-        while (
-            !Tok.isOneOf(token::lparen, token::plus, token::minus, token::kw_not, token::identifier, token::integerLiteral))
+        while (!Tok.isOneOf(token::lparen, token::plus, token::minus, token::kw_not, token::identifier,
+                            token::IntegerLiteral))
         {
             advance();
             if (Tok.is(token::eof)) return true;
         }
+
         return false;
     }
 
@@ -581,17 +629,20 @@ namespace tinylang
             {
                 OperatorInfo Op;
                 Expr *Right = nullptr;
+
                 if (parseAddOperator(Op)) goto _error;
                 if (parseTerm(Right)) goto _error;
+
                 E = Actions.actOnSimpleExpression(E, Right, Op);
             }
             if (!PrefixOp.isUnspecified()) E = Actions.actOnPrefixExpression(E, PrefixOp);
+
             return false;
         }
     _error:
         while (!Tok.isOneOf(token::hash, token::rparen, token::comma, token::semi, token::less, token::lessequal,
-                            token::equal, token::greater, token::greaterequal, token::kw_do, token::kw_else, token::kw_end,
-                            token::kw_then))
+                            token::equal, token::greater, token::greaterequal, token::kw_do, token::kw_else,
+                            token::kw_end, token::kw_then))
         {
             advance();
             if (Tok.is(token::eof)) return true;
@@ -625,7 +676,7 @@ namespace tinylang
             return false;
         }
     _error:
-        while (!Tok.isOneOf(token::lparen, token::kw_not, token::identifier, token::integerLiteral))
+        while (!Tok.isOneOf(token::lparen, token::kw_not, token::identifier, token::IntegerLiteral))
         {
             advance();
             if (Tok.is(token::eof)) return true;
@@ -637,24 +688,29 @@ namespace tinylang
     {
         {
             if (parseFactor(E)) goto _error;
+
             while (Tok.isOneOf(token::star, token::slash, token::kw_and, token::kw_div, token::kw_mod))
             {
                 OperatorInfo Op;
                 Expr *Right = nullptr;
+
                 if (parseMulOperator(Op)) goto _error;
                 if (parseFactor(Right)) goto _error;
+
                 E = Actions.actOnTerm(E, Right, Op);
             }
+
             return false;
         }
     _error:
-        while (!Tok.isOneOf(token::hash, token::rparen, token::plus, token::comma, token::minus, token::semi, token::less,
-                            token::lessequal, token::equal, token::greater, token::greaterequal, token::kw_do,
-                            token::kw_else, token::kw_end, token::kw_or, token::kw_then))
+        while (!Tok.isOneOf(token::hash, token::rparen, token::plus, token::comma, token::minus, token::semi,
+                            token::less, token::lessequal, token::equal, token::greater, token::greaterequal,
+                            token::kw_do, token::kw_else, token::kw_end, token::kw_or, token::kw_then))
         {
             advance();
             if (Tok.is(token::eof)) return true;
         }
+
         return false;
     }
 
@@ -694,7 +750,7 @@ namespace tinylang
             return false;
         }
     _error:
-        while (!Tok.isOneOf(token::lparen, token::kw_not, token::identifier, token::integerLiteral))
+        while (!Tok.isOneOf(token::lparen, token::kw_not, token::identifier, token::IntegerLiteral))
         {
             advance();
             if (Tok.is(token::eof)) return true;
@@ -705,7 +761,7 @@ namespace tinylang
     bool Parser::parseFactor(Expr *&E)
     {
         {
-            if (Tok.is(token::integerLiteral))
+            if (Tok.is(token::IntegerLiteral))
             {
                 E = Actions.actOnIntegerLiteral(Tok.getLocation(), Tok.getLiteralData());
                 advance();
@@ -714,23 +770,27 @@ namespace tinylang
             {
                 Decl *D;
                 ExprList Exprs;
+
                 if (parseQualident(D)) goto _error;
+
                 if (Tok.is(token::lparen))
                 {
                     advance();
                     if (Tok.isOneOf(token::lparen, token::plus, token::minus, token::kw_not, token::identifier,
-                                    token::integerLiteral))
+                                    token::IntegerLiteral))
                     {
                         if (parseExpList(Exprs)) goto _error;
                     }
                     if (expect(token::rparen)) goto _error;
+
                     E = Actions.actOnFunctionCall(D, Exprs);
                     advance();
                 }
-                else if (Tok.isOneOf(token::hash, token::rparen, token::star, token::plus, token::comma, token::minus,
-                                     token::slash, token::semi, token::less, token::lessequal, token::equal, token::greater,
-                                     token::greaterequal, token::kw_and, token::kw_div, token::kw_do, token::kw_else,
-                                     token::kw_end, token::kw_mod, token::kw_or, token::kw_then))
+                else if (Tok.isOneOf(token::hash, token::rparen, token::star, token::plus, token::comma,
+                                     token::minus, token::slash, token::semi, token::less, token::lessequal,
+                                     token::equal, token::greater, token::greaterequal, token::kw_and,
+                                     token::kw_div, token::kw_do, token::kw_else, token::kw_end, token::kw_mod,
+                                     token::kw_or, token::kw_then))
                 {
                     E = Actions.actOnVariable(D);
                 }
@@ -756,10 +816,10 @@ namespace tinylang
             return false;
         }
     _error:
-        while (!Tok.isOneOf(token::hash, token::rparen, token::star, token::plus, token::comma, token::minus, token::slash,
-                            token::semi, token::less, token::lessequal, token::equal, token::greater, token::greaterequal,
-                            token::kw_and, token::kw_div, token::kw_do, token::kw_else, token::kw_end, token::kw_mod,
-                            token::kw_or, token::kw_then))
+        while (!Tok.isOneOf(token::hash, token::rparen, token::star, token::plus, token::comma, token::minus,
+                            token::slash, token::semi, token::less, token::lessequal, token::equal, token::greater,
+                            token::greaterequal, token::kw_and, token::kw_div, token::kw_do, token::kw_else,
+                            token::kw_end, token::kw_mod, token::kw_or, token::kw_then))
         {
             advance();
             if (Tok.is(token::eof)) return true;
@@ -771,9 +831,12 @@ namespace tinylang
     {
         {
             D = nullptr;
+
             if (expect(token::identifier)) goto _error;
+
             D = Actions.actOnQualIdentPart(D, Tok.getLocation(), Tok.getIdentifier());
             advance();
+
             while (Tok.is(token::period) && (llvm::isa<ModuleDeclaration>(D)))
             {
                 advance();
@@ -784,10 +847,11 @@ namespace tinylang
             return false;
         }
     _error:
-        while (!Tok.isOneOf(token::hash, token::lparen, token::rparen, token::star, token::plus, token::comma, token::minus,
-                            token::slash, token::colonequal, token::semi, token::less, token::lessequal, token::equal,
-                            token::greater, token::greaterequal, token::kw_and, token::kw_div, token::kw_do, token::kw_else,
-                            token::kw_end, token::kw_mod, token::kw_or, token::kw_then))
+        while (!Tok.isOneOf(token::hash, token::lparen, token::rparen, token::star, token::plus, token::comma,
+                            token::minus, token::slash, token::colonequal, token::semi, token::less,
+                            token::lessequal, token::equal, token::greater, token::greaterequal, token::kw_and,
+                            token::kw_div, token::kw_do, token::kw_else, token::kw_end, token::kw_mod,
+                            token::kw_or, token::kw_then))
         {
             advance();
             if (Tok.is(token::eof)) return true;
@@ -799,13 +863,16 @@ namespace tinylang
     {
         {
             if (expect(token::identifier)) goto _error;
-            Ids.push_back(std::pair<llvm::SMLoc, llvm::StringRef>(Tok.getLocation(), Tok.getIdentifier()));
+
+            Ids.push_back(std::pair<SMLoc, StringRef>(Tok.getLocation(), Tok.getIdentifier()));
             advance();
+
             while (Tok.is(token::comma))
             {
                 advance();
                 if (expect(token::identifier)) goto _error;
-                Ids.push_back(std::pair<llvm::SMLoc, llvm::StringRef>(Tok.getLocation(), Tok.getIdentifier()));
+
+                Ids.push_back(std::pair<SMLoc, StringRef>(Tok.getLocation(), Tok.getIdentifier()));
                 advance();
             }
             return false;
@@ -818,8 +885,4 @@ namespace tinylang
         }
         return false;
     }
-
-
-
-
 }    // namespace tinylang

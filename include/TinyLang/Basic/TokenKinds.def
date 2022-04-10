@@ -7,14 +7,14 @@
 #endif
 
 #ifndef KEYWORD
-#define KEYWORD(ID, FLAG) TOK(kw_## ID)
+#define KEYWORD(ID, FLAG) TOK(kw_ ## ID)
 #endif
 
 TOK(unknown)                // Not a token
 TOK(eof)                    // End of file
 TOK(identifier)             // abcde123
-TOK(integerLiteral)         // 123, 123b 123H
-TOK(stringLiteral)          // "foo" 'foo'
+TOK(IntegerLiteral)         // 123, 123b 123H
+TOK(StringLiteral)          // "foo" 'foo'
 
 PUNCTUATOR(plus,                 "+")
 PUNCTUATOR(minus,                "-")

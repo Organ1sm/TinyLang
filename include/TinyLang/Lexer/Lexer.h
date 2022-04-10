@@ -5,6 +5,7 @@
 #ifndef TINYLANG_LEXER_H
 #define TINYLANG_LEXER_H
 
+#include "TinyLang/Basic/LLVM.h"
 #include "TinyLang/Basic/Diagnostic.h"
 #include "TinyLang/Lexer/Token.h"
 #include "llvm/ADT/StringMap.h"
@@ -13,64 +14,63 @@ namespace tinylang
 {
     class KeywordFilter
     {
-      private:
         llvm::StringMap<token::TokenKind> HashTable;
 
-        void addKeyword(llvm::StringRef Keyword, token::TokenKind TokenCode);
+        void addKeyword(StringRef Keyword, token::TokenKind TokenCode);
 
       public:
         void addKeywords();
 
-        token::TokenKind getKeyword(llvm::StringRef Name,
-                                    token::TokenKind DefaultTokenCode = token::unknown)
+        token::TokenKind getKeyword(StringRef Name, token::TokenKind DefaultTokenCode = token::unknown)
         {
-            auto result = HashTable.find(Name);
-            if (result != HashTable.end()) { return result->second; }
-
+            auto Result = HashTable.find(Name);
+            if (Result != HashTable.end()) return Result->second;
             return DefaultTokenCode;
         }
     };
 
     class Lexer
     {
-      private:
-        llvm::SourceMgr &SrcMgr;
+        SourceMgr &SrcMgr;
         DiagnosticsEngine &Diags;
 
         const char *CurPtr;
-        llvm::StringRef CurBuf;
+        StringRef CurBuf;
 
-        unsigned CurBufferIndex = 0;
+        /// CurBuffer - This is the current buffer index we're
+        /// lexing from as managed by the SourceMgr object.
+        unsigned CurBuffer = 0;
+
         KeywordFilter Keywords;
 
       public:
-        Lexer(llvm::SourceMgr &SrcMgr, DiagnosticsEngine &Diags) : SrcMgr(SrcMgr), Diags(Diags)
+        Lexer(SourceMgr &SrcMgr, DiagnosticsEngine &Diags) : SrcMgr(SrcMgr), Diags(Diags)
         {
-            CurBufferIndex = SrcMgr.getMainFileID();
-            CurBuf         = SrcMgr.getMemoryBuffer(CurBufferIndex)->getBuffer();
-            CurPtr         = CurBuf.begin();
+            CurBuffer = SrcMgr.getMainFileID();
+            CurBuf    = SrcMgr.getMemoryBuffer(CurBuffer)->getBuffer();
+            CurPtr    = CurBuf.begin();
             Keywords.addKeywords();
         }
 
-        DiagnosticsEngine &getDiags() const { return Diags; }
+        DiagnosticsEngine &getDiagnostics() const { return Diags; }
 
-        // Gets source code buffer.
-        llvm::StringRef getBuffer() const { return CurBuf; }
-
-        // Returns the next token from the input.
+        /// Returns the next tokenen from the input.
         void next(Token &Result);
 
+        /// Gets source code buffer.
+        StringRef getBuffer() const { return CurBuf; }
+
       private:
-        void makeIdentifier(Token &Result);
-        void makeNumber(Token &Result);
-        void makeString(Token &Result);
-        void makeComment();
+        void identifier(Token &Result);
+        void number(Token &Result);
+        void string(Token &Result);
+        void comment();
 
-        llvm::SMLoc getLoc() { return llvm::SMLoc::getFromPointer(CurPtr); }
+        SMLoc getLoc() { return SMLoc::getFromPointer(CurPtr); }
 
-        void formToken(Token &Result, const char *TokenEnd, token::TokenKind tokenKind);
+        void formToken(Token &Result, const char *TokEnd, token::TokenKind Kind);
     };
-};    // namespace tinylang
+}    // namespace tinylang
 
 
 #endif    // TINYLANG_LEXER_H

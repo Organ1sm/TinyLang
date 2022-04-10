@@ -14,15 +14,15 @@ namespace tinylang
 
     class Scope
     {
-            Scope *Parent;
-            llvm::StringMap<Decl *> Symbols;
+        Scope *Parent;
+        llvm::StringMap<Decl *> Symbols;
 
-        public:
-            explicit Scope(Scope *Parent = nullptr): Parent(Parent) {}
+      public:
+        explicit Scope(Scope *Parent = nullptr) : Parent(Parent) {}
 
-            bool insert(Decl *Declaration);
-            Decl *lookup(llvm::StringRef Name);
-            Scope *getParent() { return Parent; }
+        bool insert(Decl *Declaration);
+        Decl *lookup(llvm::StringRef Name);
+        Scope *getParent() { return Parent; }
     };
 }    // namespace tinylang
 

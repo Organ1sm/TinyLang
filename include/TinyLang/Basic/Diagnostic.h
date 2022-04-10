@@ -2,25 +2,24 @@
 // Created by yw.
 //
 
-#ifndef TINYLANG_BASIC_DIAGNOSTIC_H
-    #define TINYLANG_BASIC_DIAGNOSTIC_H
+#ifndef TINYLANG_DIAGNOSTIC_H
+#define TINYLANG_DIAGNOSTIC_H
 
-    #include "TinyLang/Basic/LLVM.h"
-    #include "llvm/ADT/StringRef.h"
-    #include "llvm/Support/FormatVariadic.h"
-    #include "llvm/Support/SMLoc.h"
-    #include "llvm/Support/SourceMgr.h"
-    #include "llvm/Support/raw_ostream.h"
-    #include <utility>
+#include "llvm/ADT/StringRef.h"
+#include "llvm/Support/FormatVariadic.h"
+#include "llvm/Support/SMLoc.h"
+#include "llvm/Support/SourceMgr.h"
+#include "llvm/Support/raw_ostream.h"
+#include <utility>
 
 namespace tinylang
 {
     namespace diag
     {
         enum {
-    #define DIAG(ID, Level, Msg) ID,
+#define DIAG(ID, Level, Msg) ID,
 
-    #include "TinyLang/Basic/Diagnostic.def"
+#include "Diagnostic.def"
         };
     }    // namespace diag
 
@@ -37,7 +36,8 @@ namespace tinylang
         DiagnosticsEngine(llvm::SourceMgr &srcMgr) : sourceMgr(srcMgr), NumErrors(0) {}
         unsigned getNumErrors() { return NumErrors; }
 
-        template <typename... Args> void report(llvm::SMLoc Loc, unsigned DiagID, Args &&...Arguments)
+        template <typename... Args>
+        void report(llvm::SMLoc Loc, unsigned DiagID, Args &&...Arguments)
         {
             std::string msg = llvm::formatv(getDiagnosticText(DiagID), std::forward<Args>(Arguments)...).str();
 
@@ -49,4 +49,3 @@ namespace tinylang
 }    // namespace tinylang
 
 #endif
-// TINYLANG_BASIC_DIAGNOSTIC_H

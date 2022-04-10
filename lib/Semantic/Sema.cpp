@@ -5,7 +5,7 @@
 #include "TinyLang/AST/AST.h"
 #include "TinyLang/Basic/Diagnostic.h"
 #include <llvm/Support/raw_ostream.h>
-#include <llvm-13/llvm/Support/Casting.h>
+#include <llvm/Support/Casting.h>
 
 namespace tinylang
 {
@@ -17,16 +17,31 @@ namespace tinylang
 
     void Sema::leaveScope()
     {
-        assert(CurrentScope && "Can't leave non-existing scope.");
+        assert(CurrentScope && "Can't leave non-existing scope");
         Scope *Parent = CurrentScope->getParent();
-
         delete CurrentScope;
-
         CurrentScope = Parent;
         CurrentDecl  = CurrentDecl->getEnclosingDecl();
     }
 
-    void Sema::checkFormalAndActualParameters(llvm::SMLoc Loc, const FormalParamList &Formals, const ExprList &Actuals)
+    bool Sema::isOperatorForType(token::TokenKind Op, TypeDeclaration *Ty)
+    {
+        switch (Op)
+        {
+            case token::plus:
+            case token::minus:
+            case token::star:
+            case token::kw_div:
+            case token::kw_mod: return Ty == IntegerType;
+            case token::slash: return false;    // REAL not implemented
+            case token::kw_and:
+            case token::kw_or:
+            case token::kw_not: return Ty == BooleanType;
+            default: llvm_unreachable("Unknown operator");
+        }
+    }
+
+    void Sema::checkFormalAndActualParameters(SMLoc Loc, const FormalParamList &Formals, const ExprList &Actuals)
     {
         if (Formals.size() != Actuals.size())
         {
@@ -45,50 +60,37 @@ namespace tinylang
                 Diags.report(Loc, diag::err_type_of_formal_and_actual_parameter_not_compatible);
             }
 
-            if (F->isVar() && llvm::isa<VariableAccess>(Arg)) { Diags.report(Loc, diag::err_var_parameter_requires_var); }
+            if (F->isVar() && llvm::isa<VariableAccess>(Arg))
+            {
+                Diags.report(Loc, diag::err_var_parameter_requires_var);
+            }
         }
     }
-    bool Sema::isOperatorForType(token::TokenKind Op, TypeDeclaration *Ty)
-    {
-        switch (Op)
-        {
-            case token::plus:
-            case token::minus:
-            case token::star:
-            case token::kw_div:
-            case token::kw_mod: return Ty == IntegerType;
-            case token::slash:
-            case token::kw_and:
-            case token::kw_or:
-            case token::kw_not: return Ty == BooleanType;
-            default: llvm_unreachable("Unknown operator.");
-        }
-    }
-
 
     void Sema::initialize()
     {
+        // Setup global scope.
         CurrentScope = new Scope();
         CurrentDecl  = nullptr;
-        IntegerType  = new TypeDeclaration(CurrentDecl, llvm::SMLoc(), "Integer");
-        BooleanType  = new TypeDeclaration(CurrentDecl, llvm::SMLoc(), "Boolean");
+        IntegerType  = new TypeDeclaration(CurrentDecl, SMLoc(), "int");
+        BooleanType  = new TypeDeclaration(CurrentDecl, SMLoc(), "bool");
         TrueLiteral  = new BooleanLiteral(true, BooleanType);
-        FalseLiteral = new BooleanLiteral(true, BooleanType);
-        TrueConst    = new ConstantDeclaration(CurrentDecl, llvm::SMLoc(), "True", TrueLiteral);
-        FalseConst   = new ConstantDeclaration(CurrentDecl, llvm::SMLoc(), "False", FalseLiteral);
+        FalseLiteral = new BooleanLiteral(false, BooleanType);
+        TrueConst    = new ConstantDeclaration(CurrentDecl, SMLoc(), "TRUE", TrueLiteral);
+        FalseConst   = new ConstantDeclaration(CurrentDecl, SMLoc(), "FALSE", FalseLiteral);
         CurrentScope->insert(IntegerType);
         CurrentScope->insert(BooleanType);
         CurrentScope->insert(TrueConst);
         CurrentScope->insert(FalseConst);
     }
 
-    ModuleDeclaration *Sema::actOnModuleDeclaration(llvm::SMLoc Loc, llvm::StringRef Name)
+    ModuleDeclaration *Sema::actOnModuleDeclaration(SMLoc Loc, StringRef Name)
     {
         return new ModuleDeclaration(CurrentDecl, Loc, Name);
     }
 
-    void Sema::actOnModuleDeclaration(ModuleDeclaration *ModDecl, llvm::SMLoc Loc, llvm::StringRef Name, DeclList &Decls,
-                                      StmtList &Stmts)
+    void Sema::actOnModuleDeclaration(
+        ModuleDeclaration *ModDecl, SMLoc Loc, StringRef Name, DeclList &Decls, StmtList &Stmts)
     {
         if (Name != ModDecl->getName())
         {
@@ -99,30 +101,32 @@ namespace tinylang
         ModDecl->setDecls(Decls);
         ModDecl->setStmts(Stmts);
     }
-    void Sema::actOnImport(llvm::StringRef ModuleName, IdentList &Ids)
+
+    void Sema::actOnImport(StringRef ModuleName, IdentList &Ids)
     {
-        Diags.report(llvm::SMLoc(), diag::err_not_yet_implemented);
+        Diags.report(SMLoc(), diag::err_not_yet_implemented);
     }
 
-    void Sema::actOnConstantDeclaration(DeclList &Decls, llvm::SMLoc Loc, llvm::StringRef Name, Expr *E)
+    void Sema::actOnConstantDeclaration(DeclList &Decls, SMLoc Loc, StringRef Name, Expr *E)
     {
         assert(CurrentScope && "CurrentScope not set");
         ConstantDeclaration *Decl = new ConstantDeclaration(CurrentDecl, Loc, Name, E);
+
         if (CurrentScope->insert(Decl))
             Decls.push_back(Decl);
         else
-            Diags.report(Loc, diag::err_symbold_declared);
+            Diags.report(Loc, diag::err_symbold_declared, Name);
     }
 
     void Sema::actOnVariableDeclaration(DeclList &Decls, IdentList &Ids, Decl *D)
     {
-        assert(CurrentScope && "CurrentScope not yet.");
+        assert(CurrentScope && "CurrentScope not set");
         if (TypeDeclaration *Ty = llvm::dyn_cast<TypeDeclaration>(D))
         {
             for (auto I = Ids.begin(), E = Ids.end(); I != E; ++I)
             {
-                llvm::SMLoc Loc           = I->first;
-                llvm::StringRef Name      = I->second;
+                SMLoc Loc                 = I->first;
+                StringRef Name            = I->second;
                 VariableDeclaration *Decl = new VariableDeclaration(CurrentDecl, Loc, Name, Ty);
                 if (CurrentScope->insert(Decl))
                     Decls.push_back(Decl);
@@ -132,20 +136,23 @@ namespace tinylang
         }
         else if (!Ids.empty())
         {
-            llvm::SMLoc Loc = Ids.front().first;
+            SMLoc Loc = Ids.front().first;
             Diags.report(Loc, diag::err_vardecl_requires_type);
         }
     }
+
     void Sema::actOnFormalParameterDeclaration(FormalParamList &Params, IdentList &Ids, Decl *D, bool IsVar)
     {
-        assert(CurrentScope && "CurrentScope not set.");
+        assert(CurrentScope && "CurrentScope not set");
         if (TypeDeclaration *Ty = llvm::dyn_cast<TypeDeclaration>(D))
         {
             for (auto I = Ids.begin(), E = Ids.end(); I != E; ++I)
             {
-                llvm::SMLoc Loc                  = I->first;
-                llvm::StringRef Name             = I->second;
-                FormalParameterDeclaration *Decl = new FormalParameterDeclaration(CurrentDecl, Loc, Name, Ty, IsVar);
+                SMLoc Loc      = I->first;
+                StringRef Name = I->second;
+                FormalParameterDeclaration *Decl =
+                    new FormalParameterDeclaration(CurrentDecl, Loc, Name, Ty, IsVar);
+
                 if (CurrentScope->insert(Decl))
                     Params.push_back(Decl);
                 else
@@ -154,15 +161,16 @@ namespace tinylang
         }
         else if (!Ids.empty())
         {
-            llvm::SMLoc Loc = Ids.front().first;
+            SMLoc Loc = Ids.front().first;
             Diags.report(Loc, diag::err_vardecl_requires_type);
         }
     }
 
-    ProcedureDeclaration *Sema::actOnProcedureDeclaration(llvm::SMLoc Loc, llvm::StringRef Name)
+    ProcedureDeclaration *Sema::actOnProcedureDeclaration(SMLoc Loc, StringRef Name)
     {
         ProcedureDeclaration *P = new ProcedureDeclaration(CurrentDecl, Loc, Name);
         if (!CurrentScope->insert(P)) Diags.report(Loc, diag::err_symbold_declared, Name);
+
         return P;
     }
 
@@ -170,12 +178,26 @@ namespace tinylang
     {
         ProcDecl->setFormalParams(Params);
         auto RetTypeDecl = llvm::dyn_cast_or_null<TypeDeclaration>(RetType);
+
         if (!RetTypeDecl && RetType)
             Diags.report(RetType->getLocation(), diag::err_returntype_must_be_type);
         else
             ProcDecl->setRetType(RetTypeDecl);
     }
-    void Sema::actOnAssignment(StmtList &Stmts, llvm::SMLoc Loc, Decl *D, Expr *E)
+
+    void Sema::actOnProcedureDeclaration(
+        ProcedureDeclaration *ProcDecl, SMLoc Loc, StringRef Name, DeclList &Decls, StmtList &Stmts)
+    {
+        if (Name != ProcDecl->getName())
+        {
+            Diags.report(Loc, diag::err_proc_identifier_not_equal);
+            Diags.report(ProcDecl->getLocation(), diag::note_proc_identifier_declaration);
+        }
+        ProcDecl->setDecls(Decls);
+        ProcDecl->setStmts(Stmts);
+    }
+
+    void Sema::actOnAssignment(StmtList &Stmts, SMLoc Loc, Decl *D, Expr *E)
     {
         if (auto Var = llvm::dyn_cast<VariableDeclaration>(D))
         {
@@ -191,18 +213,8 @@ namespace tinylang
             // TODO Emit error
         }
     }
-    void Sema::actOnProcedureDeclaration(ProcedureDeclaration *ProcDecl, llvm::SMLoc Loc, llvm::StringRef Name,
-                                         DeclList &Decls, StmtList &Stmts)
-    {
-        if (Name != ProcDecl->getName())
-        {
-            Diags.report(Loc, diag::err_proc_identifier_not_equal);
-            Diags.report(ProcDecl->getLocation(), diag::note_proc_identifier_declaration);
-        }
-        ProcDecl->setDecls(Decls);
-        ProcDecl->setStmts(Stmts);
-    }
-    void Sema::actOnProcCall(StmtList &Stmts, llvm::SMLoc Loc, Decl *D, ExprList &Params)
+
+    void Sema::actOnProcCall(StmtList &Stmts, SMLoc Loc, Decl *D, ExprList &Params)
     {
         if (auto Proc = llvm::dyn_cast<ProcedureDeclaration>(D))
         {
@@ -215,23 +227,28 @@ namespace tinylang
             Diags.report(Loc, diag::err_procedure_call_on_nonprocedure);
         }
     }
-    void Sema::actOnIfStatement(StmtList &Stmts, llvm::SMLoc Loc, Expr *Cond, StmtList &IfStmts, StmtList &ElseStmts)
+
+    void Sema::actOnIfStatement(StmtList &Stmts, SMLoc Loc, Expr *Cond, StmtList &IfStmts, StmtList &ElseStmts)
     {
         if (!Cond) Cond = FalseLiteral;
 
         if (Cond->getType() != BooleanType) { Diags.report(Loc, diag::err_if_expr_must_be_bool); }
         Stmts.push_back(new IfStatement(Cond, IfStmts, ElseStmts));
     }
-    void Sema::actOnWhileStatement(StmtList &Stmts, llvm::SMLoc Loc, Expr *Cond, StmtList &WhileStmts)
+
+    void Sema::actOnWhileStatement(StmtList &Stmts, SMLoc Loc, Expr *Cond, StmtList &WhileStmts)
     {
         if (!Cond) Cond = FalseLiteral;
 
         if (Cond->getType() != BooleanType) { Diags.report(Loc, diag::err_while_expr_must_be_bool); }
+
         Stmts.push_back(new WhileStatement(Cond, WhileStmts));
     }
-    void Sema::actOnReturnStatement(StmtList &Stmts, llvm::SMLoc Loc, Expr *RetVal)
+
+    void Sema::actOnReturnStatement(StmtList &Stmts, SMLoc Loc, Expr *RetVal)
     {
         auto *Proc = llvm::cast<ProcedureDeclaration>(CurrentDecl);
+
         if (Proc->getRetType() && !RetVal)
             Diags.report(Loc, diag::err_function_requires_return);
         else if (!Proc->getRetType() && RetVal)
@@ -245,7 +262,8 @@ namespace tinylang
     }
 
     Expr *Sema::actOnExpression(Expr *Left, Expr *Right, const OperatorInfo &Op)
-    {    // Relation
+    {
+        // Relation
         if (!Left) return Right;
         if (!Right) return Left;
 
@@ -259,7 +277,8 @@ namespace tinylang
     }
 
     Expr *Sema::actOnSimpleExpression(Expr *Left, Expr *Right, const OperatorInfo &Op)
-    {    // Addition
+    {
+        // Addition
         if (!Left) return Right;
         if (!Right) return Left;
 
@@ -268,19 +287,23 @@ namespace tinylang
             Diags.report(Op.getLocation(), diag::err_types_for_operator_not_compatible,
                          token::getPunctuatorSpelling(Op.getKind()));
         }
+
         TypeDeclaration *Ty = Left->getType();
         bool IsConst        = Left->isConst() && Right->isConst();
+
         if (IsConst && Op.getKind() == token::kw_or)
         {
             BooleanLiteral *L = llvm::dyn_cast<BooleanLiteral>(Left);
             BooleanLiteral *R = llvm::dyn_cast<BooleanLiteral>(Right);
             return L->getValue() || R->getValue() ? TrueLiteral : FalseLiteral;
         }
+
         return new InfixExpression(Left, Right, Op, Ty, IsConst);
     }
 
     Expr *Sema::actOnTerm(Expr *Left, Expr *Right, const OperatorInfo &Op)
-    {    // Multiplication
+    {
+        // Multiplication
         if (!Left) return Right;
         if (!Right) return Left;
 
@@ -291,12 +314,14 @@ namespace tinylang
         }
         TypeDeclaration *Ty = Left->getType();
         bool IsConst        = Left->isConst() && Right->isConst();
+
         if (IsConst && Op.getKind() == token::kw_and)
         {
             BooleanLiteral *L = llvm::dyn_cast<BooleanLiteral>(Left);
             BooleanLiteral *R = llvm::dyn_cast<BooleanLiteral>(Right);
             return L->getValue() && R->getValue() ? TrueLiteral : FalseLiteral;
         }
+
         return new InfixExpression(Left, Right, Op, Ty, IsConst);
     }
 
@@ -319,6 +344,7 @@ namespace tinylang
         if (Op.getKind() == token::minus)
         {
             bool Ambiguous = true;
+
             if (llvm::isa<IntegerLiteral>(E) || llvm::isa<VariableAccess>(E) || llvm::isa<ConstantAccess>(E))
                 Ambiguous = false;
             else if (auto *Infix = llvm::dyn_cast<InfixExpression>(E))
@@ -332,23 +358,24 @@ namespace tinylang
         return new PrefixExpression(E, Op, E->getType(), E->isConst());
     }
 
-
-    Expr *Sema::actOnIntegerLiteral(llvm::SMLoc Loc, llvm::StringRef Literal)
+    Expr *Sema::actOnIntegerLiteral(SMLoc Loc, StringRef Literal)
     {
         uint8_t Radix = 10;
+
         if (Literal.endswith("H"))
         {
             Literal = Literal.drop_back();
             Radix   = 16;
         }
+
         llvm::APInt Value(64, Literal, Radix);
         return new IntegerLiteral(Loc, llvm::APSInt(Value, false), IntegerType);
     }
 
-
     Expr *Sema::actOnVariable(Decl *D)
     {
         if (!D) return nullptr;
+
         if (auto *V = llvm::dyn_cast<VariableDeclaration>(D))
             return new VariableAccess(V);
         else if (auto *P = llvm::dyn_cast<FormalParameterDeclaration>(D))
@@ -375,7 +402,7 @@ namespace tinylang
         return nullptr;
     }
 
-    Decl *Sema::actOnQualIdentPart(Decl *Prev, llvm::SMLoc Loc, llvm::StringRef Name)
+    Decl *Sema::actOnQualIdentPart(Decl *Prev, SMLoc Loc, StringRef Name)
     {
         if (!Prev)
         {
@@ -394,12 +421,9 @@ namespace tinylang
             llvm_unreachable("actOnQualIdentPart only callable "
                              "with module declarations");
         }
+
         Diags.report(Loc, diag::err_undeclared_name, Name);
+
         return nullptr;
     }
-
-
-
-
-
 }    // namespace tinylang

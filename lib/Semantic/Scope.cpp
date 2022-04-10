@@ -7,11 +7,11 @@
 
 namespace tinylang
 {
-
     bool Scope::insert(Decl *Declaration)
     {
         return Symbols.insert(std::pair<llvm::StringRef, Decl *>(Declaration->getName(), Declaration)).second;
     }
+
     Decl *Scope::lookup(llvm::StringRef Name)
     {
         Scope *S = this;

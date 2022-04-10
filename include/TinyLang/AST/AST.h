@@ -4,17 +4,21 @@
 #ifndef TINYLANG_AST_H
 #define TINYLANG_AST_H
 
+#include "TinyLang/Basic/LLVM.h"
 #include "TinyLang/Basic/TokenKinds.h"
 #include "llvm/ADT/APSInt.h"
 #include "llvm/ADT/StringRef.h"
 #include "llvm/Support/SMLoc.h"
+#include <vector>
+#include <string>
+
 
 namespace tinylang
 {
     class Decl;
+    class FormalParameterDeclaration;
     class Expr;
     class Stmt;
-    class FormalParameterDeclaration;
 
     using DeclList        = std::vector<Decl *>;
     using FormalParamList = std::vector<FormalParameterDeclaration *>;
@@ -23,16 +27,16 @@ namespace tinylang
 
     class Ident
     {
-        llvm::SMLoc Loc;
-        llvm::StringRef Name;
+        SMLoc Loc;
+        StringRef Name;
 
       public:
-        Ident(llvm::SMLoc Loc, const llvm::StringRef &Name) : Loc(Loc), Name(Name) {}
-        llvm::SMLoc getLocation() { return Loc; }
-        const llvm::StringRef &getName() { return Name; }
+        Ident(SMLoc Loc, const StringRef &Name) : Loc(Loc), Name(Name) {}
+        SMLoc getLocation() { return Loc; }
+        const StringRef &getName() { return Name; }
     };
 
-    using IdentList = std::vector<std::pair<llvm::SMLoc, llvm::StringRef>>;
+    using IdentList = std::vector<std::pair<SMLoc, StringRef>>;
 
     class Decl
     {
@@ -51,17 +55,17 @@ namespace tinylang
 
       protected:
         Decl *EnclosingDecL;
-        llvm::SMLoc Loc;
-        llvm::StringRef Name;
+        SMLoc Loc;
+        StringRef Name;
 
       public:
-        Decl(DeclKind Kind, Decl *EnclosingDecL, llvm::SMLoc Loc, llvm::StringRef Name)
-                : Kind(Kind), EnclosingDecL(EnclosingDecL), Loc(Loc), Name(Name)
+        Decl(DeclKind Kind, Decl *EnclosingDecL, SMLoc Loc, StringRef Name)
+            : Kind(Kind), EnclosingDecL(EnclosingDecL), Loc(Loc), Name(Name)
         {}
 
         DeclKind getKind() const { return Kind; }
-        llvm::SMLoc getLocation() { return Loc; }
-        llvm::StringRef getName() { return Name; }
+        SMLoc getLocation() { return Loc; }
+        StringRef getName() { return Name; }
         Decl *getEnclosingDecl() { return EnclosingDecL; }
     };
 
@@ -71,11 +75,12 @@ namespace tinylang
         StmtList Stmts;
 
       public:
-        ModuleDeclaration(Decl *EnclosingDecL, llvm::SMLoc Loc, llvm::StringRef Name) : Decl(DK_Module, EnclosingDecL, Loc, Name)
+        ModuleDeclaration(Decl *EnclosingDecL, SMLoc Loc, StringRef Name)
+            : Decl(DK_Module, EnclosingDecL, Loc, Name)
         {}
 
-        ModuleDeclaration(Decl *EnclosingDecL, llvm::SMLoc Loc, llvm::StringRef Name, DeclList &Decls, StmtList &Stmts)
-                : Decl(DK_Module, EnclosingDecL, Loc, Name), Decls(Decls), Stmts(Stmts)
+        ModuleDeclaration(Decl *EnclosingDecL, SMLoc Loc, StringRef Name, DeclList &Decls, StmtList &Stmts)
+            : Decl(DK_Module, EnclosingDecL, Loc, Name), Decls(Decls), Stmts(Stmts)
         {}
 
         const DeclList &getDecls() { return Decls; }
@@ -91,8 +96,8 @@ namespace tinylang
         Expr *E;
 
       public:
-        ConstantDeclaration(Decl *EnclosingDecL, llvm::SMLoc Loc, llvm::StringRef Name, Expr *E)
-                : Decl(DK_Const, EnclosingDecL, Loc, Name), E(E)
+        ConstantDeclaration(Decl *EnclosingDecL, SMLoc Loc, StringRef Name, Expr *E)
+            : Decl(DK_Const, EnclosingDecL, Loc, Name), E(E)
         {}
 
         Expr *getExpr() { return E; }
@@ -103,7 +108,8 @@ namespace tinylang
     class TypeDeclaration : public Decl
     {
       public:
-        TypeDeclaration(Decl *EnclosingDecL, llvm::SMLoc Loc, llvm::StringRef Name) : Decl(DK_Type, EnclosingDecL, Loc, Name) {}
+        TypeDeclaration(Decl *EnclosingDecL, SMLoc Loc, StringRef Name) : Decl(DK_Type, EnclosingDecL, Loc, Name)
+        {}
 
         static bool classof(const Decl *D) { return D->getKind() == DK_Type; }
     };
@@ -113,8 +119,8 @@ namespace tinylang
         TypeDeclaration *Ty;
 
       public:
-        VariableDeclaration(Decl *EnclosingDecL, llvm::SMLoc Loc, llvm::StringRef Name, TypeDeclaration *Ty)
-                : Decl(DK_Var, EnclosingDecL, Loc, Name), Ty(Ty)
+        VariableDeclaration(Decl *EnclosingDecL, SMLoc Loc, StringRef Name, TypeDeclaration *Ty)
+            : Decl(DK_Var, EnclosingDecL, Loc, Name), Ty(Ty)
         {}
 
         TypeDeclaration *getType() { return Ty; }
@@ -128,8 +134,8 @@ namespace tinylang
         bool IsVar;
 
       public:
-        FormalParameterDeclaration(Decl *EnclosingDecL, llvm::SMLoc Loc, llvm::StringRef Name, TypeDeclaration *Ty, bool IsVar)
-                : Decl(DK_Param, EnclosingDecL, Loc, Name), Ty(Ty), IsVar(IsVar)
+        FormalParameterDeclaration(Decl *EnclosingDecL, SMLoc Loc, StringRef Name, TypeDeclaration *Ty, bool IsVar)
+            : Decl(DK_Param, EnclosingDecL, Loc, Name), Ty(Ty), IsVar(IsVar)
         {}
 
         TypeDeclaration *getType() { return Ty; }
@@ -146,12 +152,18 @@ namespace tinylang
         StmtList Stmts;
 
       public:
-        ProcedureDeclaration(Decl *EnclosingDecL, llvm::SMLoc Loc, llvm::StringRef Name) : Decl(DK_Proc, EnclosingDecL, Loc, Name)
+        ProcedureDeclaration(Decl *EnclosingDecL, SMLoc Loc, StringRef Name)
+            : Decl(DK_Proc, EnclosingDecL, Loc, Name)
         {}
 
-        ProcedureDeclaration(Decl *EnclosingDecL, llvm::SMLoc Loc, llvm::StringRef Name, FormalParamList &Params,
-                             TypeDeclaration *RetType, DeclList &Decls, StmtList &Stmts)
-                : Decl(DK_Proc, EnclosingDecL, Loc, Name), Params(Params), RetType(RetType), Decls(Decls), Stmts(Stmts)
+        ProcedureDeclaration(Decl *EnclosingDecL,
+                             SMLoc Loc,
+                             StringRef Name,
+                             FormalParamList &Params,
+                             TypeDeclaration *RetType,
+                             DeclList &Decls,
+                             StmtList &Stmts)
+            : Decl(DK_Proc, EnclosingDecL, Loc, Name), Params(Params), RetType(RetType), Decls(Decls), Stmts(Stmts)
         {}
 
         const FormalParamList &getFormalParams() { return Params; }
@@ -169,17 +181,17 @@ namespace tinylang
 
     class OperatorInfo
     {
-        llvm::SMLoc Loc;
-        uint32_t Kind : 16;
+        SMLoc Loc;
+        uint32_t Kind          : 16;
         uint32_t IsUnspecified : 1;
 
       public:
         OperatorInfo() : Loc(), Kind(token::unknown), IsUnspecified(true) {}
-        OperatorInfo(llvm::SMLoc Loc, token::TokenKind Kind, bool IsUnspecified = false)
-                : Loc(Loc), Kind(Kind), IsUnspecified(IsUnspecified)
+        OperatorInfo(SMLoc Loc, token::TokenKind Kind, bool IsUnspecified = false)
+            : Loc(Loc), Kind(Kind), IsUnspecified(IsUnspecified)
         {}
 
-        llvm::SMLoc getLocation() const { return Loc; }
+        SMLoc getLocation() const { return Loc; }
         token::TokenKind getKind() const { return static_cast<token::TokenKind>(Kind); }
         bool isUnspecified() const { return IsUnspecified; }
     };
@@ -220,7 +232,7 @@ namespace tinylang
 
       public:
         InfixExpression(Expr *Left, Expr *Right, OperatorInfo Op, TypeDeclaration *Ty, bool IsConst)
-                : Expr(EK_Infix, Ty, IsConst), Left(Left), Right(Right), Op(Op)
+            : Expr(EK_Infix, Ty, IsConst), Left(Left), Right(Right), Op(Op)
         {}
 
         Expr *getLeft() { return Left; }
@@ -237,7 +249,7 @@ namespace tinylang
 
       public:
         PrefixExpression(Expr *E, OperatorInfo Op, TypeDeclaration *Ty, bool IsConst)
-                : Expr(EK_Prefix, Ty, IsConst), E(E), Op(Op)
+            : Expr(EK_Prefix, Ty, IsConst), E(E), Op(Op)
         {}
 
         Expr *getExpr() { return E; }
@@ -248,12 +260,12 @@ namespace tinylang
 
     class IntegerLiteral : public Expr
     {
-        llvm::SMLoc Loc;
+        SMLoc Loc;
         llvm::APSInt Value;
 
       public:
-        IntegerLiteral(llvm::SMLoc Loc, const llvm::APSInt &Value, TypeDeclaration *Ty)
-                : Expr(EK_Int, Ty, true), Loc(Loc), Value(Value)
+        IntegerLiteral(SMLoc Loc, const llvm::APSInt &Value, TypeDeclaration *Ty)
+            : Expr(EK_Int, Ty, true), Loc(Loc), Value(Value)
         {}
         llvm::APSInt &getValue() { return Value; }
 
@@ -289,7 +301,9 @@ namespace tinylang
         ConstantDeclaration *Const;
 
       public:
-        ConstantAccess(ConstantDeclaration *Const) : Expr(EK_Const, Const->getExpr()->getType(), true), Const(Const) {}
+        ConstantAccess(ConstantDeclaration *Const)
+            : Expr(EK_Const, Const->getExpr()->getType(), true), Const(Const)
+        {}
 
         ConstantDeclaration *geDecl() { return Const; }
 
@@ -303,7 +317,7 @@ namespace tinylang
 
       public:
         FunctionCallExpr(ProcedureDeclaration *Proc, ExprList Params)
-                : Expr(EK_Func, Proc->getRetType(), false), Proc(Proc), Params(Params)
+            : Expr(EK_Func, Proc->getRetType(), false), Proc(Proc), Params(Params)
         {}
 
         ProcedureDeclaration *geDecl() { return Proc; }
@@ -353,7 +367,8 @@ namespace tinylang
         ExprList Params;
 
       public:
-        ProcedureCallStatement(ProcedureDeclaration *Proc, ExprList &Params) : Stmt(SK_ProcCall), Proc(Proc), Params(Params)
+        ProcedureCallStatement(ProcedureDeclaration *Proc, ExprList &Params)
+            : Stmt(SK_ProcCall), Proc(Proc), Params(Params)
         {}
 
         ProcedureDeclaration *getProc() { return Proc; }
@@ -370,7 +385,7 @@ namespace tinylang
 
       public:
         IfStatement(Expr *Cond, StmtList &IfStmts, StmtList &ElseStmts)
-                : Stmt(SK_If), Cond(Cond), IfStmts(IfStmts), ElseStmts(ElseStmts)
+            : Stmt(SK_If), Cond(Cond), IfStmts(IfStmts), ElseStmts(ElseStmts)
         {}
 
         Expr *getCond() { return Cond; }
@@ -405,7 +420,6 @@ namespace tinylang
 
         static bool classof(const Stmt *S) { return S->getKind() == SK_Return; }
     };
-
 
 }    // namespace tinylang
 

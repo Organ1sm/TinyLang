@@ -13,4 +13,4 @@ namespace tinylang
     std::string getTinyLangVersion();
 }
 
-#endif //TINYLANG_VERSION_H
+#endif    // TINYLANG_VERSION_H

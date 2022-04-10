@@ -1,4 +1,3 @@
-//
 // Created by yw.
 //
 
@@ -32,7 +31,8 @@ namespace tinylang
         bool isNot(token::TokenKind K) const { return Kind != K; }
         bool isOneOf(token::TokenKind K1, token::TokenKind K2) const { return is(K1) || is(K2); }
 
-        template <typename... Ts> bool isOneOf(token::TokenKind K1, token::TokenKind K2, Ts... Ks) const
+        template <typename... Ts>
+        bool isOneOf(token::TokenKind K1, token::TokenKind K2, Ts... Ks) const
         {
             return is(K1) || isOneOf(K2, Ks...);
         }
@@ -49,7 +49,7 @@ namespace tinylang
 
         llvm::StringRef getLiteralData()
         {
-            assert(isOneOf(token::integerLiteral, token::stringLiteral)
+            assert(isOneOf(token::IntegerLiteral, token::StringLiteral)
                    && "Cannot get literal data of non-literal");
             return llvm::StringRef(Ptr, Length);
         }

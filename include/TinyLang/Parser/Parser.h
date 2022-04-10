@@ -18,14 +18,14 @@ namespace tinylang
         Sema &Actions;
         Token Tok;
 
-        DiagnosticsEngine &getDiagnostics() const { return Lex.getDiags(); }
+        DiagnosticsEngine &getDiagnostics() const { return Lex.getDiagnostics(); }
 
         void advance() { Lex.next(Tok); }
 
         bool expect(token::TokenKind ExpectedTok)
         {
             if (Tok.is(ExpectedTok)) { return false; }
-
+            // There must be a better way!
             const char *Expected = token::getPunctuatorSpelling(ExpectedTok);
             if (!Expected) Expected = token::getKeywordSpelling(ExpectedTok);
 
@@ -42,9 +42,9 @@ namespace tinylang
                 advance();
                 return false;
             }
-
             return true;
         }
+
         bool parseCompilationUnit(ModuleDeclaration *&D);
         bool parseImport();
         bool parseBlock(DeclList &Decls, StmtList &Stmts);
@@ -73,6 +73,7 @@ namespace tinylang
 
       public:
         Parser(Lexer &Lex, Sema &Actions);
+
         ModuleDeclaration *parse();
     };
 }    // namespace tinylang
